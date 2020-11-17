@@ -13,15 +13,24 @@ function Server(options) {
     };
     this.postRequests = {};
 
+    this.cache = {};
+
     this.server.on('stream', (stream, headers, flags) => {
         const req = new IncomingMessage(stream, headers, flags);
-        const res = new OutcomingMessage(stream);
-        const urlGetHandler = this.getRequests[req.getPath()];
-        const urlPostHandler = this.postRequests[req.getPath()];
+        const res = new OutcomingMessage(stream, headers, this.cache);
+        const path = req.getPath();
+        const method = req.getMethod();
+        const urlGetHandler = this.getRequests[path];
+        const urlPostHandler = this.postRequests[path];
 
-        if (urlGetHandler && req.getMethod() === 'GET') {
-            urlGetHandler(req, res);
-        } else if (urlPostHandler && req.getMethod() === 'POST') {
+        if (urlGetHandler && method === 'GET') {
+            if ( this.cache[path] && !headers['cache-control'].includes('no-cache') ) {
+                stream.respond(this.cache[path].headers);
+                stream.end(this.cache[path].data);
+            } else {
+                urlGetHandler(req, res);
+            }
+        } else if (urlPostHandler && method === 'POST') {
             urlPostHandler(req, res);
         }
     });
